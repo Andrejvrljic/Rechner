@@ -1,0 +1,30 @@
+# Prüft jeden Pull Request: Rechenkern, Duell-Logik, API (mit Test-Datenbank) und den kompletten
+# Worker lokal in wrangler dev inklusive Durable Object, D1 und WebSocket.
+name: Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit-Tests
+        run: npm test
+
+      - name: Worker lokal starten und Live-Test dagegen laufen lassen
+        run: |
+          npm install --no-save --no-audit --no-fund wrangler@4
+          npx wrangler dev --port 8787 --var VERSION:ci > wrangler.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs localhost:8787/api/health && break; sleep 1; done
+          TEST_URL=http://localhost:8787 EXPECT_VERSION=ci node --disable-warning=ExperimentalWarning --test test/live.test.js
+
+      - name: Wrangler-Log bei Fehler
+        if: failure()
+        run: cat wrangler.log || true

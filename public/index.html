@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rechner</title>
+<meta name="description" content="Taschenrechner mit wissenschaftlichen Funktionen, Verlauf und Rechen-Duell">
+<meta name="theme-color" content="#101218">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rechner">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-view="calc" role="tab">Rechner</button>
+    <button class="tab" data-view="duel" role="tab">Duell</button>
+    <button class="tab" data-view="board" role="tab">Rangliste</button>
+    <button class="tab" data-view="account" role="tab" id="tab-account">Konto</button>
+  </nav>
+
+  <!-- Rechner -->
+  <section class="view active" id="view-calc">
+    <div class="display" id="display" title="Tippen zum Kopieren">
+      <div class="disp-top">
+        <button class="chip" id="btn-history" aria-label="Verlauf">Verlauf</button>
+        <span class="chip ghost" id="angle-ind">DEG</span>
+      </div>
+      <div class="expr" id="expr" aria-live="polite"></div>
+      <div class="result" id="result"></div>
+    </div>
+
+    <div class="modebar">
+      <button class="seg active" data-mode="std">Standard</button>
+      <button class="seg" data-mode="sci">Wissenschaftlich</button>
+      <button class="seg small" id="btn-angle">DEG / RAD</button>
+    </div>
+
+    <div class="keys sci-keys" id="sci-keys" hidden>
+      <button class="k fn" data-k="2nd" id="k-2nd">2nd</button>
+      <button class="k fn" data-k="(">(</button>
+      <button class="k fn" data-k=")">)</button>
+      <button class="k fn" data-k="π">π</button>
+      <button class="k fn" data-k="e">e</button>
+
+      <button class="k fn" data-k="sin" data-k2="asin" data-l2="sin⁻¹">sin</button>
+      <button class="k fn" data-k="cos" data-k2="acos" data-l2="cos⁻¹">cos</button>
+      <button class="k fn" data-k="tan" data-k2="atan" data-l2="tan⁻¹">tan</button>
+      <button class="k fn" data-k="ln" data-k2="eˣ" data-l2="eˣ">ln</button>
+      <button class="k fn" data-k="log" data-k2="10ˣ" data-l2="10ˣ">log</button>
+
+      <button class="k fn" data-k="√" data-k2="∛" data-l2="∛">√</button>
+      <button class="k fn" data-k="x²" data-k2="x³" data-l2="x³">x²</button>
+      <button class="k fn" data-k="^">xʸ</button>
+      <button class="k fn" data-k="!">x!</button>
+      <button class="k fn" data-k="1/x">1/x</button>
+    </div>
+
+    <div class="keys" id="keys">
+      <button class="k util" data-k="AC" id="k-ac">AC</button>
+      <button class="k util" data-k="⌫" aria-label="Löschen">⌫</button>
+      <button class="k util" data-k="%">%</button>
+      <button class="k op" data-k="÷">÷</button>
+
+      <button class="k" data-k="7">7</button>
+      <button class="k" data-k="8">8</button>
+      <button class="k" data-k="9">9</button>
+      <button class="k op" data-k="×">×</button>
+
+      <button class="k" data-k="4">4</button>
+      <button class="k" data-k="5">5</button>
+      <button class="k" data-k="6">6</button>
+      <button class="k op" data-k="−">−</button>
+
+      <button class="k" data-k="1">1</button>
+      <button class="k" data-k="2">2</button>
+      <button class="k" data-k="3">3</button>
+      <button class="k op" data-k="+">+</button>
+
+      <button class="k" data-k="±">±</button>
+      <button class="k" data-k="0">0</button>
+      <button class="k" data-k=",">,</button>
+      <button class="k eq" data-k="=">=</button>
+    </div>
+
+    <div class="sheet" id="history-sheet" hidden>
+      <div class="sheet-head">
+        <strong>Verlauf</strong>
+        <span class="muted small" id="history-where"></span>
+        <button class="link" id="btn-history-clear">Leeren</button>
+        <button class="link" id="btn-history-close" aria-label="Schließen">✕</button>
+      </div>
+      <ul class="history" id="history-list"></ul>
+    </div>
+  </section>
+
+  <!-- Rechen-Duell -->
+  <section class="view" id="view-duel">
+    <div id="duel-start" class="card">
+      <h2>Rechen-Duell</h2>
+      <p class="muted">Kopfrechnen gegen Freunde: Alle bekommen dieselbe Aufgabe, wer zuerst richtig antwortet, holt den Punkt.</p>
+      <label class="field">Dein Name
+        <input id="duel-name" maxlength="20" autocomplete="nickname" placeholder="Gast">
+      </label>
+      <button class="btn primary" id="btn-create">Neuen Raum erstellen</button>
+      <div class="or">oder</div>
+      <div class="row">
+        <input id="duel-code" maxlength="6" placeholder="CODE" autocapitalize="characters" autocomplete="off" class="code-input">
+        <button class="btn" id="btn-join">Beitreten</button>
+      </div>
+      <p class="error" id="duel-error"></p>
+    </div>
+
+    <div id="duel-room" class="card" hidden>
+      <div class="room-head">
+        <div>
+          <div class="muted small">Raum</div>
+          <div class="room-code" id="room-code"></div>
+        </div>
+        <button class="btn small" id="btn-share">Einladen</button>
+        <button class="btn small ghost" id="btn-leave">Verlassen</button>
+      </div>
+      <ul class="players" id="players"></ul>
+
+      <div id="duel-lobby">
+        <div class="row" id="host-controls">
+          <label class="field inline">Runden
+            <select id="duel-rounds"><option>5</option><option selected>10</option><option>15</option><option>20</option></select>
+          </label>
+          <button class="btn primary" id="btn-start">Starten</button>
+        </div>
+        <p class="muted" id="wait-host">Warte, bis der Gastgeber startet …</p>
+        <div id="duel-final"></div>
+      </div>
+
+      <div id="duel-play" hidden>
+        <div class="muted small" id="task-n"></div>
+        <div class="task" id="task-text"></div>
+        <div class="timebar"><div id="timebar"></div></div>
+        <form id="answer-form" class="row" autocomplete="off">
+          <input id="answer" inputmode="numeric" placeholder="Antwort" class="answer-input" enterkeyhint="send">
+          <button class="btn primary">OK</button>
+        </form>
+        <div class="feedback" id="feedback"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Rangliste -->
+  <section class="view" id="view-board">
+    <div class="card">
+      <h2>Rangliste</h2>
+      <p class="muted">Gewonnene Rechen-Duelle (nur angemeldete Spieler).</p>
+      <table class="board"><thead><tr><th>#</th><th>Name</th><th>Siege</th><th>Spiele</th><th>Richtig</th></tr></thead>
+        <tbody id="board-body"></tbody></table>
+    </div>
+  </section>
+
+  <!-- Konto -->
+  <section class="view" id="view-account">
+    <div class="card" id="acc-out">
+      <h2>Konto</h2>
+      <p class="muted">Mit einem Konto wird dein Verlauf auf allen Geräten gespeichert und deine Duell-Siege kommen in die Rangliste.</p>
+      <form id="auth-form" autocomplete="on">
+        <label class="field">Name <input id="auth-name" autocomplete="username" maxlength="20" required></label>
+        <label class="field">Passwort <input id="auth-pass" type="password" autocomplete="current-password" required minlength="6"></label>
+        <div class="row">
+          <button class="btn primary" id="btn-login" type="submit">Anmelden</button>
+          <button class="btn" id="btn-register" type="button">Registrieren</button>
+        </div>
+        <p class="error" id="auth-error"></p>
+      </form>
+    </div>
+    <div class="card" id="acc-in" hidden>
+      <h2 id="acc-title">Hallo</h2>
+      <div class="stats" id="acc-stats"></div>
+      <div class="row">
+        <button class="btn" id="btn-logout">Abmelden</button>
+      </div>
+      <details class="danger">
+        <summary>Konto löschen</summary>
+        <p class="muted small">Löscht dein Konto, deinen Verlauf und deine Ranglisten-Einträge endgültig.</p>
+        <div class="row">
+          <input id="del-pass" type="password" placeholder="Passwort" autocomplete="current-password">
+          <button class="btn danger" id="btn-delete">Endgültig löschen</button>
+        </div>
+        <p class="error" id="del-error"></p>
+      </details>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
