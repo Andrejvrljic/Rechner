@@ -1,0 +1,105 @@
+# Veröffentlicht den Rechner bei jedem Merge auf main auf Cloudflare – wie ECLIPSE und Brawl Engine:
+#   Worker (App + API), Durable Object (Rechen-Duell über WebSocket), D1 (Konten, Verlauf, Rangliste)
+# Adresse: https://rechner.<deine-subdomain>.workers.dev
+#
+# Einmalig nötig (Settings → Secrets and variables → Actions → New repository secret):
+#   CLOUDFLARE_API_TOKEN   – derselbe Token wie bei ECLIPSE (Rechte: Workers Scripts Edit, D1 Edit)
+#   CLOUDFLARE_ACCOUNT_ID  – optional, wird sonst automatisch ermittelt
+# Die workers.dev-Subdomain wird nur gelesen, nie geändert.
+name: Cloudflare (App + Multiplayer + Datenbank)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DB_NAME: rechner-db
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Secret prüfen
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Das Repository-Secret CLOUDFLARE_API_TOKEN fehlt (Settings → Secrets and variables → Actions). Nimm denselben Cloudflare-Token wie bei ECLIPSE."
+            exit 1
+          fi
+
+      - name: Tests und Wrangler
+        run: |
+          npm test
+          npm install --no-save --no-audit --no-fund wrangler@4
+
+      - name: Cloudflare-Konto und Subdomain ermitteln (nur lesen)
+        run: |
+          API=https://api.cloudflare.com/client/v4
+          AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          ACC="$CLOUDFLARE_ACCOUNT_ID"
+          if [ -z "$ACC" ]; then
+            ACC="$(curl -fsS -H "$AUTH" "$API/accounts?per_page=5" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s).result||[];process.stdout.write(r[0]?r[0].id:"")})')"
+          fi
+          if [ -z "$ACC" ]; then echo "::error::Cloudflare-Konto nicht gefunden. Lege das Secret CLOUDFLARE_ACCOUNT_ID an."; exit 1; fi
+          echo "CLOUDFLARE_ACCOUNT_ID=$ACC" >> "$GITHUB_ENV"
+          SUB="$(curl -sS -H "$AUTH" "$API/accounts/$ACC/workers/subdomain" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);process.stdout.write((j.result&&j.result.subdomain)||"")}catch{}})')"
+          if [ -z "$SUB" ]; then echo "::error::Keine workers.dev-Subdomain gefunden."; exit 1; fi
+          echo "SUBDOMAIN=$SUB" >> "$GITHUB_ENV"
+          echo "URL=https://rechner.$SUB.workers.dev" >> "$GITHUB_ENV"
+          echo "Subdomain: $SUB.workers.dev"
+
+      - name: D1-Datenbank sicherstellen
+        run: |
+          find_db() {
+            npx wrangler d1 list --json 2>/dev/null | node -e '
+              let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+                const i = s.indexOf("["); if (i < 0) return;
+                const db = JSON.parse(s.slice(i)).find(x => x.name === process.env.DB_NAME);
+                if (db) process.stdout.write(db.uuid || db.id || "");
+              });'
+          }
+          DB_ID="$(find_db)"
+          if [ -z "$DB_ID" ]; then
+            echo "Lege D1-Datenbank $DB_NAME an …"
+            npx wrangler d1 create "$DB_NAME"
+            DB_ID="$(find_db)"
+          fi
+          if [ -z "$DB_ID" ]; then echo "::error::D1-Datenbank konnte nicht angelegt werden. Hat der Token das Recht D1: Edit?"; exit 1; fi
+          sed -i "s/__D1_DATABASE_ID__/$DB_ID/" wrangler.toml
+          echo "D1-Datenbank: $DB_ID"
+
+      - name: Rechner veröffentlichen
+        run: |
+          npx wrangler deploy --var "VERSION:$GITHUB_SHA"
+          echo "::notice title=Rechner::$URL"
+          echo "### 🧮 Online: $URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Warten, bis die neue Version live ist
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fs "$URL/api/health" | grep -q "\"version\":\"$GITHUB_SHA\""; then echo "Neue Version ist live."; exit 0; fi
+            sleep 3
+          done
+          echo "::error::Die neue Version ist nach 3 Minuten noch nicht online."; exit 1
+
+      - name: Live-Test (Seite, Datenbank, Multiplayer)
+        run: TEST_URL="$URL" EXPECT_VERSION="$GITHUB_SHA" node --disable-warning=ExperimentalWarning --test test/live.test.js
+
+      - name: Testkonten wieder löschen
+        if: always()
+        run: |
+          npx wrangler d1 execute "$DB_NAME" --remote --command "
+            DELETE FROM history  WHERE account_id IN (SELECT id FROM accounts WHERE login LIKE 'rtest%');
+            DELETE FROM sessions WHERE account_id IN (SELECT id FROM accounts WHERE login LIKE 'rtest%');
+            DELETE FROM accounts WHERE login LIKE 'rtest%';" || echo "::warning::Testkonten konnten nicht gelöscht werden."

@@ -1,0 +1,25 @@
+name = "rechner"
+main = "cloudflare/worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+# Die App selbst (HTML, CSS, JavaScript)
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+# Rechen-Duell: ein Durable Object pro Raum (Echtzeit über WebSocket)
+[[durable_objects.bindings]]
+name = "DUEL"
+class_name = "DuelDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DuelDO"]
+
+# Konten, Verlauf, Rangliste. database_id setzt der GitHub-Actions-Workflow ein.
+[[d1_databases]]
+binding = "DB"
+database_name = "rechner-db"
+database_id = "__D1_DATABASE_ID__"

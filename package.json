@@ -1,0 +1,14 @@
+{
+  "name": "rechner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Taschenrechner mit Verlauf, Konten und Rechen-Duell – läuft auf Cloudflare",
+  "type": "module",
+  "scripts": {
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "dev": "npx wrangler@4 dev"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
